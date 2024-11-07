@@ -10,7 +10,7 @@ from decimal import Decimal
 import re
 from selenium.webdriver.chrome.service import Service
 import os
-import json
+import requests
 
 # COLOR FORMATS
 HEADER = '\033[95m'
@@ -35,21 +35,21 @@ class Bot:
         self.load_config()
 
         # Setting parameters
-        self.headless = self.config["headless"]
-        self.email = self.config["credentials"]["email"],
-        self.password = self.config["credentials"]["password"]
-        self.login_url = self.config["urls"]["login_url"]
-        self.wishlist_url = self.config["urls"]["wishlist_url"]
-        self.cart_url = self.config["urls"]["cart_url"]
+        self.headless = self.config["bot_data"]["headless"]
+        self.email = self.config["bot_data"]["medimops_account_email"],
+        self.password = self.config["bot_data"]["medimops_account_password"]
+        self.login_url =  self.config["bot_data"]["login_url"]
+        self.wishlist_url =  self.config["bot_data"]["wishlist_url"]
+        self.cart_url =  self.config["bot_data"]["cart_url"]
 
-        self.product_names = [i for i in self.config["products"]]
+        self.product_names = [i for i in self.config["max_price_data"]]
 
         
-        print(f"🤖{WARNING} [LOG] {ENDC}-> {OKBLUE}Initializing GoLogin with profile ID: {self.config['gologin']['profile_id']}{ENDC}")
+        print(f"🤖{WARNING} [LOG] {ENDC}-> {OKBLUE}Initializing GoLogin with profile ID: {self.config['bot_data']['gologin_profile_id']}{ENDC}")
         # Initialize GoLogin
         self.gl = GoLogin({
-            "token": self.config["gologin"]["token"],
-            "profile_id":  self.config["gologin"]["profile_id"],
+            "token": self.config["bot_data"]["gologin_token"],
+            "profile_id":  self.config["bot_data"]['gologin_profile_id'],
             "profile_path": PROFILE_PATH
         })
 
@@ -68,8 +68,14 @@ class Bot:
 
     def load_config(self):
 
-        with open('config.json', encoding="utf8") as f:
-            self.config = json.load(f)
+        response = requests.post(
+            "http://127.0.0.1:8000/get-bot-info/",
+            data={
+                "password": "Theprotonguy18_"
+            }
+        )
+
+        self.config = response.json()
 
     def __handle_consent_popup(self):
         """Handle the consent popup using JavaScript execution."""
@@ -191,8 +197,14 @@ class Bot:
                 price_number = re.findall(r"\d+,\d+|\d+", price_text)[0].replace(",", ".")
                 price_value = float(price_number)
 
-                if self.product_names and product_name in self.product_names.values():
-                    if Decimal(price_value) <= self.config["cart"]["item_max_price"]:
+                # check to see if product has max price and gtet it
+                product_max_price = self.get_max_price_item(product_name)
+
+                # make sure bot has loaded max pricrs for product and make sure that product name is in list
+                if self.product_names and product_max_price is not None:
+
+                    # make sure the product price is not above set limit 
+                    if Decimal(price_value) <= product_max_price:
                         # Extract the URL of the product
                         product_link = product.find_element(By.TAG_NAME, "a")  # Adjust if necessary
                         url = product_link.get_attribute("href")
@@ -208,6 +220,21 @@ class Bot:
 
         return active_product_urls
     
+    def get_max_price_item(self, item_name):
+
+        """
+        
+        loop through max product data to the max price of a product
+        Returns none if item name is not in the max price list
+        
+        """
+        
+        for max_price_data_item in  self.config["max_price_data"]:
+            if item_name == max_price_data_item["item_name"]:
+                return Decimal(max_price_data_item["max_price"])
+            
+        return None
+
     def add_products_to_cart(self):
 
         products = self.__get_product_urls_from_wishlist()
@@ -264,7 +291,7 @@ class Bot:
                 let previousError = false;
                 let maxReached = false;
                 let incrementCount = 1; // Initialize the increment counter
-                const maxIncrements = """ + str(self.config['cart']['max_product_increments']) + r""";  
+                const maxIncrements = """ + str(self.config['bot_data']['max_product_increments']) + r""";  
 
                 while (!maxReached && incrementCount < maxIncrements) {
                     increaseButton.click();
@@ -350,7 +377,7 @@ class Bot:
         card_type_select = WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((By.ID, 'cardType'))
         )
-        card_type_select.send_keys(self.config["card"]["card_type"])
+        card_type_select.send_keys(self.config["bot_data"]["card_type"])
 
         time.sleep(2)
 
@@ -361,7 +388,7 @@ class Bot:
         
         account_holder_input.send_keys(Keys.CONTROL + "a")  # Select all text
         account_holder_input.send_keys(Keys.DELETE)  # Delete the selected text
-        account_holder_input.send_keys(self.config["card"]["card_holder_name"])
+        account_holder_input.send_keys(self.config["bot_data"]["card_holder_name"])
 
         time.sleep(2)
 
@@ -372,7 +399,7 @@ class Bot:
         self.driver.switch_to.frame(card_number_iframe)
         card_number_input = self.driver.find_element(By.XPATH, "//input[@type='text']")
         card_number_input.clear()
-        card_number_input.send_keys(self.config["card"]["card_number"])
+        card_number_input.send_keys(self.config["bot_data"]["card_number"])
         self.driver.switch_to.default_content()
 
         time.sleep(2)
@@ -389,7 +416,7 @@ class Bot:
         expiry_month_input = WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((By.ID, 'cardexpiremonth'))
         )
-        expiry_month_input.send_keys(str(self.config["card"]["valid_until_month"]))
+        expiry_month_input.send_keys(str(self.config["bot_data"]["expiration_month"]))
 
         self.driver.switch_to.default_content()
 
@@ -403,7 +430,7 @@ class Bot:
         expiry_year_input =  WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((By.ID, 'cardexpireyear'))
         )
-        expiry_year_input.send_keys(str(self.config["card"]["valid_until_year"]))
+        expiry_year_input.send_keys(str(self.config["bot_data"]["expiration_year"]))
         
         self.driver.switch_to.default_content()
 
@@ -418,7 +445,7 @@ class Bot:
             EC.presence_of_element_located((By.ID, 'cardcvc2'))
         )
         cvv_input.clear()
-        cvv_input.send_keys(str(self.config["card"]["cvv"]))
+        cvv_input.send_keys(str(self.config["bot_data"]["cvv"]))
 
         self.driver.switch_to.default_content()
 
@@ -441,20 +468,25 @@ class Bot:
         print(f"🤖{WARNING} [LOG] {ENDC}-> {OKGREEN}Bot stopped successfully.{ENDC}")
 
     def run(self):
-        self.login()
-
         while True:
-            self.add_products_to_cart()
-            self.max_out_cart_items()
-            self.checkout()
-            
-            print(f"🤖{WARNING} [LOG] {ENDC}-> {OKBLUE}Completed checkout. Waiting 1 hour to run again...{ENDC}\n\n")
-            
-            # wait an hour
-            time.sleep(3600)
+            # make sure to check if bot status is set to running
+            if self.config["bot_data"]["is_running"]:
 
-            # update the config file in case there was a change
-            self.load_config()
+                self.login()
+                self.add_products_to_cart()
+                self.max_out_cart_items()
+                self.checkout()
+                
+                print(f"🤖{WARNING} [LOG] {ENDC}-> {OKBLUE}Completed checkout. Waiting 1 hour to run again...{ENDC}\n\n")
+                
+                # stop the bot and GoLogin session
+                self.stop()
+
+                # wait an hour
+                time.sleep(3600)
+
+                # update the config file in case there was a change
+                self.load_config() # remove
 
 # Instantiate and use the bot
 bot = Bot()
