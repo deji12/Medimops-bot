@@ -61,7 +61,7 @@ class Bot:
         chrome_options = Options()
         chrome_options.add_experimental_option("debuggerAddress", debugger_address)
         if self.headless:
-            chrome_options.add_argument("--headless=new")
+            chrome_options.add_argument('--headless=new')
 
         # Initialize the driver with the GoLogin profile
         self.driver = webdriver.Chrome(service=CHROME_DRIVER_SERVICE, options=chrome_options)
@@ -69,7 +69,7 @@ class Bot:
     def load_config(self):
 
         response = requests.post(
-            "http://127.0.0.1:8000/get-bot-info/",
+            "http://203.161.53.121:8000/get-bot-info/",
             data={
                 "password": "Theprotonguy18_"
             }
@@ -123,6 +123,27 @@ class Bot:
 
         except Exception as e:
             print(f"🤖{WARNING} [LOG] {ENDC}-> {FAIL}Login error: {e}{ENDC}")
+
+    def logout(self):
+
+        print(f"🤖{WARNING} [LOG] {ENDC}-> {OKCYAN}Logging out of account...{ENDC}")
+
+        self.driver.get(self.login_url)
+
+        time.sleep(5)
+
+        try:
+            # Locate the "Log out" button by its class and click it
+            logout_button = self.driver.find_element(By.CLASS_NAME, "dashboard__button-secondary")
+            logout_button.click()
+            
+            # Optional wait to ensure page navigates after clicking logout
+            time.sleep(10)
+
+        except Exception as e:
+            print(f"🤖{WARNING} [ERROR] {ENDC}-> {OKCYAN}Failed to log out: {e}{ENDC}")
+
+
 
     def __add_wishlist_items_to_cart(self):
         """Retrieve products where the back again email switch is on and add them to the cart."""
@@ -280,7 +301,7 @@ class Bot:
         print(f"🤖{WARNING} [LOG] {ENDC}-> {OKCYAN}Maxing out cart item quantities...{ENDC}")
 
         self.driver.get(self.cart_url)
-        time.sleep(5)
+        time.sleep(15)
 
         # Define JavaScript to handle quantity increase with a promise
         js_code = r"""
@@ -458,7 +479,9 @@ class Bot:
         checkout_button = self.driver.find_element(By.CLASS_NAME, 'checkout-navigation-buttons__button-next')
         checkout_button.click()
 
-        time.sleep(60)
+        time.sleep(120)
+
+        print(f"🤖{WARNING} [LOG] {ENDC}-> {OKBLUE}Completed checkout. Waiting 1 hour to run again...{ENDC}\n\n")
 
     def stop(self):
         """Stop the GoLogin profile session."""
@@ -476,8 +499,7 @@ class Bot:
                 self.add_products_to_cart()
                 self.max_out_cart_items()
                 self.checkout()
-                
-                print(f"🤖{WARNING} [LOG] {ENDC}-> {OKBLUE}Completed checkout. Waiting 1 hour to run again...{ENDC}\n\n")
+                self.logout()
                 
                 # stop the bot and GoLogin session
                 self.stop()
