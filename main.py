@@ -118,7 +118,7 @@ class Bot:
 
             # Hit the return key and submit login details
             enter_password.send_keys(Keys.RETURN)
-            time.sleep(5)
+            time.sleep(20)
             print(f"🤖{WARNING} [LOG] {ENDC}-> {OKGREEN}Login submitted.{ENDC}")
 
         except Exception as e:
@@ -269,12 +269,12 @@ class Bot:
             time.sleep(3)  # Wait for the page to load (adjust as necessary)
 
             script = '''
-                var variantLinks = document.getElementsByClassName('variant-select__variant');
+                var variantLinks = document.getElementsByClassName('VariantSelect_desktopVariant__fq62h');
                 for (var i = 0; i < variantLinks.length; i++) {
                     variantLinks[i].click();  // Click each variant
                     
                     // Scroll to and click the "Add to Cart" button
-                    var addToCartButton = document.querySelector('.add-to-cart');
+                    var addToCartButton = document.querySelector('.AddToCart_container__6uz0c');
                     if (addToCartButton) {
                         addToCartButton.scrollIntoView();
                         addToCartButton.click();
@@ -294,6 +294,7 @@ class Bot:
             
             # Execute the script in Selenium
             self.driver.execute_script(script)
+            time.sleep(15)
 
             print(f"🤖{WARNING} [LOG] {ENDC}-> {OKCYAN}Added product variants to cart successfully{ENDC}")
 
