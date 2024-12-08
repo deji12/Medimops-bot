@@ -1,15 +1,11 @@
 import time
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
-from gologin import GoLogin
+import undetected_chromedriver as uc
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from decimal import Decimal
 import re
-from selenium.webdriver.chrome.service import Service
-import os
 import requests
 
 # COLOR FORMATS
@@ -23,13 +19,11 @@ ENDC = '\033[0m'
 BOLD = '\033[1m'
 UNDERLINE = '\033[4m'
 
-CHROME_DRIVER_SERVICE = Service('chromedriver.exe')
-
-PROFILE_PATH = f'C:/Users/{os.getlogin()}/Desktop/medimops-bot'
+DRIVER_PATH = './chromedriver.exe'
 
 class Bot:
     def __init__(self):
-        print(f"🤖{WARNING} [LOG] {ENDC}-> {OKCYAN}Initializing Bot with GoLogin profile...{ENDC}")
+        print(f"🤖{WARNING} [LOG] {ENDC}-> {OKCYAN}Initializing Bot with credentials...{ENDC}")
 
         # load config
         self.load_config()
@@ -44,27 +38,17 @@ class Bot:
 
         self.product_names = [i for i in self.config["max_price_data"]]
 
-        
-        print(f"🤖{WARNING} [LOG] {ENDC}-> {OKBLUE}Initializing GoLogin with profile ID: {self.config['bot_data']['gologin_profile_id']}{ENDC}")
-        # Initialize GoLogin
-        self.gl = GoLogin({
-            "token": self.config["bot_data"]["gologin_token"],
-            "profile_id":  self.config["bot_data"]['gologin_profile_id'],
-            "profile_path": PROFILE_PATH
-        })
-
-        # Get the debugger address to attach Selenium to GoLogin profile
-        debugger_address = self.gl.start()
-
-        print(f"🤖{WARNING} [LOG] {ENDC}-> {OKBLUE}Starting Chrome with GoLogin debugger address: {debugger_address}{ENDC}\n\n")
+       
         # Set Chrome options to connect to GoLogin's profile
-        chrome_options = Options()
-        chrome_options.add_experimental_option("debuggerAddress", debugger_address)
-        if self.headless:
-            chrome_options.add_argument('--headless=new')
-
+        chrome_options = uc.ChromeOptions()
+    
         # Initialize the driver with the GoLogin profile
-        self.driver = webdriver.Chrome(service=CHROME_DRIVER_SERVICE, options=chrome_options)
+        self.driver = uc.Chrome(
+            use_subprocess=False, 
+            driver_executable_path=DRIVER_PATH, 
+            options=chrome_options,
+            headless = self.headless
+        )
 
     def load_config(self):
 
@@ -111,10 +95,14 @@ class Bot:
             enter_email.send_keys(self.email)
             print(f"🤖{WARNING} [LOG] {ENDC}-> {OKGREEN}Entered email successfully.{ENDC}")
 
+            time.sleep(5)
+
             # Insert password
             enter_password = self.driver.find_element(By.NAME, "lgn_pwd")
             enter_password.send_keys(self.password)
             print(f"🤖{WARNING} [LOG] {ENDC}-> {OKGREEN}Entered password successfully.{ENDC}")
+
+            time.sleep(5)
 
             # Hit the return key and submit login details
             enter_password.send_keys(Keys.RETURN)
@@ -142,8 +130,6 @@ class Bot:
 
         except Exception as e:
             print(f"🤖{WARNING} [ERROR] {ENDC}-> {OKCYAN}Failed to log out: {e}{ENDC}")
-
-
 
     def __add_wishlist_items_to_cart(self):
         """Retrieve products where the back again email switch is on and add them to the cart."""
@@ -286,15 +272,26 @@ class Bot:
                     // Delay in-between clicks (simulating wait)
                     var start = new Date().getTime();
                     var end = start;
-                    while (end < start + 5000) {  // 5-second wait
+                    while (end < start + 15000) {  // 5-second wait
                         end = new Date().getTime();
                     }
                 }
+                const doneIndicator = document.createElement('div');
+                doneIndicator.id = 'incrementDone';
+                document.body.appendChild(doneIndicator);
             '''
-            
-            # Execute the script in Selenium
-            self.driver.execute_script(script)
-            time.sleep(15)
+
+            try:
+                self.driver.execute_script(script)
+            except Exception as e:
+                if "script timeout" in str(e).lower():  # Check for timeout specifically
+                    print("🤖 Script timed out, waiting for completion...")
+                    WebDriverWait(self.driver, 5000).until(
+                        EC.presence_of_element_located((By.ID, 'incrementDone'))
+                    )
+                    print("🤖 Script completed successfully after timeout.")
+                else:
+                    print(f"🤖 Error adding products to cart: {e}")
 
             print(f"🤖{WARNING} [LOG] {ENDC}-> {OKCYAN}Added product variants to cart successfully{ENDC}")
 
@@ -486,9 +483,9 @@ class Bot:
 
     def stop(self):
         """Stop the GoLogin profile session."""
-        print(f"🤖{WARNING} [LOG] {ENDC}-> {OKCYAN}Stopping the bot and GoLogin session...{ENDC}")
+        # print(f"🤖{WARNING} [LOG] {ENDC}-> {OKCYAN}Stopping the bot and GoLogin session...{ENDC}")
         self.driver.quit()
-        self.gl.stop()
+        # self.gl.stop()
         print(f"🤖{WARNING} [LOG] {ENDC}-> {OKGREEN}Bot stopped successfully.{ENDC}")
 
     def run(self):
@@ -511,6 +508,7 @@ class Bot:
                 # update the config file in case there was a change
                 self.load_config() # remove
 
-# Instantiate and use the bot
-bot = Bot()
-bot.run()
+if __name__ == '__main__':
+    # Instantiate and use the bot
+    bot = Bot()
+    bot.run()
